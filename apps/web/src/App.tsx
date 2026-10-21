@@ -7,7 +7,8 @@ type Analysis = {
   metrics: { service_status: string; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
   findings: Finding[]; recommendations: string[]; analyzed_at: string; simulation: boolean;
 };
-type ApiResponse = { success: boolean; data?: Analysis; error?: { code: string; message: string } | null };\ntype ExplanationResponse = { success: boolean; data?: { explanation: string; model: string; generated_at: string; advisory: boolean }; error?: { code: string; message: string } | null };
+type ApiResponse = { success: boolean; data?: Analysis; error?: { code: string; message: string } | null };
+type ExplanationResponse = { success: boolean; data?: { explanation: string; model: string; generated_at: string; advisory: boolean }; error?: { code: string; message: string } | null };
 type FormValues = { service_name: string; service_status: "running" | "stopped"; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
 const demo: FormValues = { service_name: "Messaging Service", service_status: "running", cpu_percent: 96, memory_percent: 78, queue_depth: 1850, error_count: 42 };
 
