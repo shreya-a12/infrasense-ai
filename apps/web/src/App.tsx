@@ -1,29 +1,41 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-type HealthResponse = {
-  success: boolean;
-  data?: { service: string; status: string; diagnostics: string; timestamp: string };
-  error?: { code: string; message: string } | null;
+type Severity = "critical" | "high" | "medium" | "low";
+type Finding = { code: string; severity: Severity; title: string; evidence: string; likely_cause: string };
+type Analysis = {
+  incident_id: string; service_name: string; severity: Severity; summary: string;
+  metrics: { service_status: string; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
+  findings: Finding[]; recommendations: string[]; analyzed_at: string; simulation: boolean;
 };
+type ApiResponse = { success: boolean; data?: Analysis; error?: { code: string; message: string } | null };
+type FormValues = { service_name: string; service_status: "running" | "stopped"; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
+const demo: FormValues = { service_name: "Messaging Service", service_status: "running", cpu_percent: 96, memory_percent: 78, queue_depth: 1850, error_count: 42 };
 
 export default function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<FormValues>(demo);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/v1/health", { signal: controller.signal })
-      .then(async (response) => setHealth((await response.json()) as HealthResponse))
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === "AbortError") return;
-        setHealth({ success: false, error: { code: "API_UNAVAILABLE", message: "Start the Express and Python services, then refresh." } });
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, []);
+  function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
 
-  const status = loading ? "Checking services" : health?.success ? "All services connected" : "Service needs attention";
+  async function runAnalysis(values = form) {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/v1/diagnostics/analyze", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(values)
+      });
+      const payload = (await response.json()) as ApiResponse;
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error?.message ?? "Diagnostic request failed.");
+      setAnalysis(payload.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to run diagnostics. Check that all services are running.");
+    } finally { setLoading(false); }
+  }
 
+  const severityClass = (severity: Severity) => "severity severity-" + severity;
   return (
     <main className="shell">
       <header className="topbar">
@@ -32,18 +44,39 @@ export default function App() {
       </header>
       <section className="hero">
         <p className="eyebrow">INFRASTRUCTURE OPERATIONS CENTER</p>
-        <h1>Clarity when systems<br /><span>need attention.</span></h1>
-        <p className="intro">A local-first workspace for investigating service health, server metrics, logs, and messaging incidents.</p>
-        <div className={"status-banner " + (health?.success ? "is-ok" : loading ? "is-loading" : "is-error")} role="status"><span className="status-indicator" />{status}</div>
+        <h1>Find the signal.<br /><span>Understand the incident.</span></h1>
+        <p className="intro">Run transparent diagnostic rules against simulated infrastructure signals. No production systems are connected.</p>
+        <div className="status-banner is-ok" role="status"><span className="status-indicator" /> Phase 2 · Rule-based diagnostics</div>
       </section>
-      <section className="grid" aria-label="Foundation status">
-        <article className="panel"><span className="panel-label">MILESTONE</span><h2>01 <span>/ 05</span></h2><p>Project foundation</p><div className="progress"><span /></div><small>Service skeleton and health checks</small></article>
-        <article className="panel"><span className="panel-label">EXPRESS API</span><h2>{loading ? "Checking" : health?.data?.service ? "Reachable" : "Offline"}</h2><p>REST API status</p><small>GET /api/v1/health</small></article>
-        <article className="panel"><span className="panel-label">PYTHON DIAGNOSTICS</span><h2>{loading ? "Checking" : health?.data?.diagnostics === "healthy" ? "Connected" : "Unavailable"}</h2><p>FastAPI health service</p><small>Diagnostic rules arrive in Phase 2</small></article>
+      <section className="workbench">
+        <div className="section-heading"><div><p className="eyebrow">INCIDENT WORKBENCH</p><h2>Analyze a service incident</h2></div><span className="demo-pill">SIMULATED DATA</span></div>
+        <div className="form-grid">
+          <label>Service name<input value={form.service_name} onChange={(e) => update("service_name", e.target.value)} /></label>
+          <label>Service status<select value={form.service_status} onChange={(e) => update("service_status", e.target.value as FormValues["service_status"])}><option value="running">Running</option><option value="stopped">Stopped</option></select></label>
+          <label>CPU utilization (%)<input type="number" min="0" max="100" value={form.cpu_percent} onChange={(e) => update("cpu_percent", Number(e.target.value))} /></label>
+          <label>Memory utilization (%)<input type="number" min="0" max="100" value={form.memory_percent} onChange={(e) => update("memory_percent", Number(e.target.value))} /></label>
+          <label>Messaging queue depth<input type="number" min="0" value={form.queue_depth} onChange={(e) => update("queue_depth", Number(e.target.value))} /></label>
+          <label>Application error count<input type="number" min="0" value={form.error_count} onChange={(e) => update("error_count", Number(e.target.value))} /></label>
+        </div>
+        <div className="actions"><button className="primary-button" onClick={() => void runAnalysis()} disabled={loading || form.service_name.trim().length < 2}>{loading ? "Analyzing incident…" : "Run diagnostics"} <span aria-hidden="true">↗</span></button><button className="secondary-button" onClick={() => { setForm(demo); void runAnalysis(demo); }} disabled={loading}>Load demo incident</button></div>
+        {error && <p className="error-note" role="alert">{error}</p>}
       </section>
-      <section className="next-step"><div><p className="eyebrow">WHAT COMES NEXT</p><h2>Build trust in the evidence.</h2><p>Next, add simulated server metrics, sample logs, service checks, and repeatable diagnostic rules before introducing AI.</p></div><span className="next-icon" aria-hidden="true">↗</span></section>
-      {health?.error && <p className="error-note"><strong>{health.error.code}:</strong> {health.error.message}</p>}
-      <footer><span>InfraSense AI · Development build</span><span>Simulated environment · No production systems connected</span></footer>
+      {analysis && <section className="results" aria-live="polite">
+        <div className="section-heading"><div><p className="eyebrow">DIAGNOSTIC REPORT · {analysis.incident_id}</p><h2>{analysis.service_name}</h2></div><span className={severityClass(analysis.severity)}>{analysis.severity} severity</span></div>
+        <p className="result-summary">{analysis.summary}</p>
+        <div className="metric-grid">
+          <article className="metric"><span>CPU</span><strong>{analysis.metrics.cpu_percent}%</strong><div className="metric-track"><span style={{ width: analysis.metrics.cpu_percent + "%" }} /></div></article>
+          <article className="metric"><span>Memory</span><strong>{analysis.metrics.memory_percent}%</strong><div className="metric-track"><span style={{ width: analysis.metrics.memory_percent + "%" }} /></div></article>
+          <article className="metric"><span>Queue depth</span><strong>{analysis.metrics.queue_depth.toLocaleString()}</strong></article>
+          <article className="metric"><span>Errors</span><strong>{analysis.metrics.error_count.toLocaleString()}</strong></article>
+        </div>
+        <h3>Findings ({analysis.findings.length})</h3>
+        <div className="finding-list">{analysis.findings.map((f) => <article className="finding" key={f.code}><div className="finding-top"><h4>{f.title}</h4><span className={severityClass(f.severity)}>{f.severity}</span></div><p>{f.evidence}</p><p><strong>Possible cause:</strong> {f.likely_cause}</p><small>Rule ID: {f.code}</small></article>)}</div>
+        <h3>Recommended next steps</h3>
+        <ol className="recommendations">{analysis.recommendations.map((item, i) => <li key={item}><span>{String(i + 1).padStart(2, "0")}</span>{item}</li>)}</ol>
+        <p className="disclaimer">Rule-based demo output · Verify findings before taking action on any real system.</p>
+      </section>}
+      <footer><span>InfraSense AI · Phase 2 development build</span><span>Simulated environment · No production systems connected</span></footer>
     </main>
   );
 }
