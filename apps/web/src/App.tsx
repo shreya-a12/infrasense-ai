@@ -7,7 +7,7 @@ type Analysis = {
   metrics: { service_status: string; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
   findings: Finding[]; recommendations: string[]; analyzed_at: string; simulation: boolean;
 };
-type ApiResponse = { success: boolean; data?: Analysis; error?: { code: string; message: string } | null };
+type ApiResponse = { success: boolean; data?: Analysis; error?: { code: string; message: string } | null };\ntype ExplanationResponse = { success: boolean; data?: { explanation: string; model: string; generated_at: string; advisory: boolean }; error?: { code: string; message: string } | null };
 type FormValues = { service_name: string; service_status: "running" | "stopped"; cpu_percent: number; memory_percent: number; queue_depth: number; error_count: number };
 const demo: FormValues = { service_name: "Messaging Service", service_status: "running", cpu_percent: 96, memory_percent: 78, queue_depth: 1850, error_count: 42 };
 
@@ -15,7 +15,7 @@ export default function App() {
   const [form, setForm] = useState<FormValues>(demo);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState("");\n  const [aiExplanation, setAiExplanation] = useState("");\n  const [aiLoading, setAiLoading] = useState(false);\n  const [aiError, setAiError] = useState("");
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -35,6 +35,21 @@ export default function App() {
     } finally { setLoading(false); }
   }
 
+  async function explainWithAI() {
+    if (!analysis) return;
+    setAiLoading(true); setAiError(""); setAiExplanation("");
+    try {
+      const response = await fetch("/api/v1/diagnostics/explain", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(analysis)
+      });
+      const payload = (await response.json()) as ExplanationResponse;
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error?.message ?? "AI explanation failed.");
+      setAiExplanation(payload.data.explanation);
+    } catch (caught) {
+      setAiError(caught instanceof Error ? caught.message : "Unable to generate AI explanation.");
+    } finally { setAiLoading(false); }
+  }
+
   const severityClass = (severity: Severity) => "severity severity-" + severity;
   return (
     <main className="shell">
@@ -46,7 +61,7 @@ export default function App() {
         <p className="eyebrow">INFRASTRUCTURE OPERATIONS CENTER</p>
         <h1>Find the signal.<br /><span>Understand the incident.</span></h1>
         <p className="intro">Run transparent diagnostic rules against simulated infrastructure signals. No production systems are connected.</p>
-        <div className="status-banner is-ok" role="status"><span className="status-indicator" /> Phase 2 · Rule-based diagnostics</div>
+        <div className="status-banner is-ok" role="status"><span className="status-indicator" /> Phase 3 · Rule-based diagnostics + AI explanation</div>
       </section>
       <section className="workbench">
         <div className="section-heading"><div><p className="eyebrow">INCIDENT WORKBENCH</p><h2>Analyze a service incident</h2></div><span className="demo-pill">SIMULATED DATA</span></div>
@@ -74,7 +89,14 @@ export default function App() {
         <div className="finding-list">{analysis.findings.map((f) => <article className="finding" key={f.code}><div className="finding-top"><h4>{f.title}</h4><span className={severityClass(f.severity)}>{f.severity}</span></div><p>{f.evidence}</p><p><strong>Possible cause:</strong> {f.likely_cause}</p><small>Rule ID: {f.code}</small></article>)}</div>
         <h3>Recommended next steps</h3>
         <ol className="recommendations">{analysis.recommendations.map((item, i) => <li key={item}><span>{String(i + 1).padStart(2, "0")}</span>{item}</li>)}</ol>
-        <p className="disclaimer">Rule-based demo output · Verify findings before taking action on any real system.</p>
+        <div className="ai-explainer">
+          <div className="section-heading"><div><p className="eyebrow">PHASE 3 · AI ASSISTANCE</p><h3>Explain this incident</h3></div><span className="demo-pill">EVIDENCE-BASED</span></div>
+          <p className="ai-hint">Ask the AI to explain the findings already produced by the rule engine. The AI does not run commands or change systems.</p>
+          <button className="primary-button" onClick={() => void explainWithAI()} disabled={aiLoading}>{aiLoading ? "Generating explanation…" : "Generate AI explanation"} <span aria-hidden="true">↗</span></button>
+          {aiError && <p className="error-note" role="alert">{aiError}</p>}
+          {aiExplanation && <div className="ai-response"><p className="eyebrow">AI EXPLANATION</p><p>{aiExplanation}</p></div>}
+        </div>
+        <p className="disclaimer">Rule-based findings + optional AI explanation · Verify recommendations before acting on real systems.</p>
       </section>}
       <footer><span>InfraSense AI · Phase 2 development build</span><span>Simulated environment · No production systems connected</span></footer>
     </main>
