@@ -26,16 +26,8 @@ app.get("/api/v1/health", async (_req: Request, res: Response) => {
   const healthy = diagnostics === "healthy";
   res.status(healthy ? 200 : 503).json({
     success: healthy,
-    data: {
-      service: "infrasense-api",
-      status: healthy ? "healthy" : "degraded",
-      diagnostics,
-      timestamp: new Date().toISOString()
-    },
-    error: healthy ? null : {
-      code: "DIAGNOSTICS_UNAVAILABLE",
-      message: "The Python diagnostics service could not be reached."
-    }
+    data: { service: "infrasense-api", status: healthy ? "healthy" : "degraded", diagnostics, timestamp: new Date().toISOString() },
+    error: healthy ? null : { code: "DIAGNOSTICS_UNAVAILABLE", message: "The Python diagnostics service could not be reached." }
   });
 });
 
@@ -50,8 +42,7 @@ app.post("/api/v1/diagnostics/analyze", async (req: Request, res: Response, next
         body: JSON.stringify(req.body),
         signal: controller.signal
       });
-      const payload = await response.json();
-      res.status(response.status).json(payload);
+      res.status(response.status).json(await response.json());
     } finally {
       clearTimeout(timeout);
     }
@@ -67,12 +58,9 @@ app.get("/api/v1", (_req: Request, res: Response) => {
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ success: false, data: null, error: { code: "NOT_FOUND", message: "The requested route does not exist." } });
 });
-
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = error instanceof Error ? error.message : "Unexpected server error";
   res.status(500).json({ success: false, data: null, error: { code: "INTERNAL_ERROR", message } });
 });
 
-app.listen(port, "127.0.0.1", () => {
-  console.log("InfraSense API listening at http://127.0.0.1:" + port);
-});
+app.listen(port, "127.0.0.1", () => console.log("InfraSense API listening at http://127.0.0.1:" + port));
