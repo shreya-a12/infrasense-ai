@@ -39,8 +39,29 @@ app.get("/api/v1/health", async (_req: Request, res: Response) => {
   });
 });
 
+app.post("/api/v1/diagnostics/analyze", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(new URL("/api/v1/diagnostics/analyze", diagnosticsBaseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(req.body),
+        signal: controller.signal
+      });
+      const payload = await response.json();
+      res.status(response.status).json(payload);
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/v1", (_req: Request, res: Response) => {
-  res.json({ success: true, data: { name: "InfraSense AI API", version: "v1", milestone: "phase-1-foundation" }, error: null });
+  res.json({ success: true, data: { name: "InfraSense AI API", version: "v1", milestone: "phase-2-rule-based-diagnostics" }, error: null });
 });
 
 app.use((_req: Request, res: Response) => {
