@@ -1,0 +1,15 @@
+{
+  "name": "infrasense-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered IT support and infrastructure troubleshooting",
+  "workspaces": ["apps/web", "apps/api"],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @infrasense/web",
+    "dev:api": "npm run dev --workspace @infrasense/api",
+    "dev:diagnostics": "python -m uvicorn app.main:app --app-dir services/diagnostics --host 127.0.0.1 --port 8000 --reload",
+    "build": "npm run build --workspace @infrasense/web && npm run build --workspace @infrasense/api",
+    "typecheck": "npm run typecheck --workspace @infrasense/web && npm run typecheck --workspace @infrasense/api"
+  },
+  "engines": {"node": ">=20"}
+}
